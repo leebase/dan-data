@@ -1,0 +1,7 @@
+{
+  "spec_version": "1.0",
+  "readme_sha256": "c2dfde7d45fab7f70a253b803f8c049d28cd7f64599fb5528edc3055d5a9edf9",
+  "architecture_sha256": "41666f2c7fbdd6f20880e0068c21eab8035755c270bfaa5d1e390ecfe22f6c6f",
+  "random_seed": 42,
+  "rowcount_fact_encounter": 80000
+}
