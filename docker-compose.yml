@@ -1,0 +1,58 @@
+services:
+  opencode-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autocoder-agent
+    ports:
+      # Expose port for OpenAI OAuth callback
+      - "1455:1455"
+    volumes:
+      # Mount config (read-only for templates, read-write for runtime)
+      - ./config:/workspace/config:ro
+      - ./config/.openrouter.key:/workspace/config/.openrouter.key:ro
+      
+      # Mount OpenCode config to persist OAuth credentials
+      - opencode-config:/root/.opencode
+      
+      # Mount SSH key for GitHub authentication
+      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+      - ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro
+      
+      # Mount prompts and tasks (read-only)
+      - ./prompts:/workspace/prompts:ro
+      - ./tasks:/workspace/tasks:ro
+      
+      # Mount data directory for runtime state (read-write)
+      - ./data:/workspace/data:rw
+      
+      # Mount scripts (read-only - agent cannot modify)
+      - ./scripts:/workspace/scripts:ro
+      
+      # Mount verifier scripts and tests (read-write for test execution)
+      - ./verifier:/workspace/verifier:rw
+      
+      # Mount AGENTS.md so agent can read it
+      - ./AGENTS.md:/workspace/AGENTS.md:ro
+      
+      # Mount .git for version control operations
+      - ./.git:/workspace/.git:rw
+      
+      # Mount working directory for agent to create files
+      - ./workspace:/workspace/workspace:rw
+    
+    environment:
+      # Load API keys from mounted files
+      - OPENROUTER_API_KEY_FILE=/workspace/config/.openrouter.key
+      # OpenAI key loaded from file if it exists, otherwise from env
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    
+    # Override default command if needed
+    # command: ["agent-loop", "5"]  # Run 5 iterations instead of default 10
+    
+    # Uncomment to keep container running for debugging
+    # command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  opencode-config:
+    driver: local

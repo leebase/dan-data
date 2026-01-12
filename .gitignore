@@ -1,0 +1,44 @@
+# Secrets and API keys
+config/.openrouter.key
+*.key
+*.secret
+.env.local
+
+# Runtime data (agent progress and state)
+data/
+.opencode/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+*.log
+
+# Archives (previous agent runs)
+archive/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Language-specific
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
