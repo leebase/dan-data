@@ -19,6 +19,26 @@ def quarter_for_month(month: int) -> int:
     return (month - 1) // 3 + 1
 
 
+def date_range(start: dt.date, end: dt.date) -> list[dt.date]:
+    dates = []
+    current = start
+    while current <= end:
+        dates.append(current)
+        current += dt.timedelta(days=1)
+    return dates
+
+
+def sigma_band_value() -> str:
+    roll = random.random()
+    if roll < 0.68:
+        return "Within_1σ"
+    if roll < 0.95:
+        return "Within_2σ"
+    if roll < 0.99:
+        return "Within_3σ"
+    return "Outside_3σ"
+
+
 def build_dim_date(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -> None:
     rows = []
     current = start
@@ -243,6 +263,155 @@ def build_dim_payer(cursor: sqlite3.Cursor) -> None:
     )
 
 
+def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -> None:
+    row_target = 80000
+    visit_types = ["Intake", "FollowUp", "Crisis", "Group"]
+    visit_weights = [0.2, 0.55, 0.1, 0.15]
+    quality_notes = [
+        "Late entry",
+        "Weekend scheduling",
+        "Missing consent form",
+        "Manual correction",
+    ]
+
+    patient_ids = [row[0] for row in cursor.execute("SELECT patient_id FROM dim_patient").fetchall()]
+    provider_rows = cursor.execute(
+        "SELECT provider_id, home_facility_id FROM dim_provider"
+    ).fetchall()
+    provider_ids = [row[0] for row in provider_rows]
+    provider_facilities = {row[0]: row[1] for row in provider_rows}
+    facility_regions = {
+        row[0]: row[1]
+        for row in cursor.execute("SELECT facility_id, region_type FROM dim_facility").fetchall()
+    }
+    diagnosis_ids = [row[0] for row in cursor.execute("SELECT diagnosis_id FROM dim_diagnosis").fetchall()]
+    payer_ids = [row[0] for row in cursor.execute("SELECT payer_id FROM dim_payer").fetchall()]
+
+    max_wait_days = 30
+    all_dates = date_range(start, end)
+    latest_request_date = end - dt.timedelta(days=max_wait_days)
+    request_dates = [date for date in all_dates if date <= latest_request_date]
+
+    patient_provider = {}
+    patient_last_noshow = {}
+
+    rows = []
+    for encounter_id in range(1, row_target + 1):
+        patient_id = random.choice(patient_ids)
+        if patient_id in patient_provider and random.random() < 0.7:
+            provider_id = patient_provider[patient_id]
+        else:
+            provider_id = random.choice(provider_ids)
+            patient_provider[patient_id] = provider_id
+
+        facility_id = provider_facilities[provider_id]
+        diagnosis_id = random.choice(diagnosis_ids)
+        payer_id = random.choice(payer_ids)
+        visit_type = random.choices(visit_types, weights=visit_weights, k=1)[0]
+        request_date = random.choice(request_dates)
+
+        base_wait = {
+            "Intake": random.randint(7, 21),
+            "FollowUp": random.randint(3, 14),
+            "Crisis": random.randint(0, 3),
+            "Group": random.randint(1, 10),
+        }[visit_type]
+        if facility_regions.get(facility_id) == "Rural":
+            base_wait += random.randint(2, 6)
+        wait_days = max(0, min(base_wait, max_wait_days))
+        scheduled_date = request_date + dt.timedelta(days=wait_days)
+
+        month = scheduled_date.month
+        weekday = scheduled_date.isoweekday()
+        no_show_prob = 0.12
+        if month in {6, 7, 8, 12}:
+            no_show_prob += 0.05
+        if weekday in {1, 5}:
+            no_show_prob += 0.05
+        if patient_last_noshow.get(patient_id):
+            no_show_prob += 0.05
+
+        roll = random.random()
+        if roll < no_show_prob:
+            encounter_status = "NoShow"
+        elif roll < no_show_prob + 0.08:
+            encounter_status = "Cancelled"
+        elif roll < no_show_prob + 0.13:
+            encounter_status = "Scheduled"
+        else:
+            encounter_status = "Completed"
+
+        no_show_flag = 1 if encounter_status == "NoShow" else 0
+        if encounter_status == "Completed":
+            completed_date = scheduled_date + dt.timedelta(days=random.randint(0, 2))
+            completed_date_key = date_key(completed_date)
+            outcome_score = random.randint(1, 10)
+        else:
+            completed_date_key = None
+            outcome_score = None
+
+        duration_minutes = {
+            "Intake": random.randint(75, 120),
+            "FollowUp": random.randint(45, 60),
+            "Crisis": random.randint(60, 90),
+            "Group": random.randint(90, 120),
+        }[visit_type]
+
+        data_quality_flag = 1 if random.random() < 0.025 else 0
+        quality_note = random.choice(quality_notes) if data_quality_flag == 1 else ""
+
+        rows.append(
+            (
+                encounter_id,
+                patient_id,
+                provider_id,
+                facility_id,
+                diagnosis_id,
+                payer_id,
+                date_key(request_date),
+                date_key(scheduled_date),
+                completed_date_key,
+                encounter_status,
+                visit_type,
+                wait_days,
+                duration_minutes,
+                outcome_score,
+                no_show_flag,
+                sigma_band_value(),
+                data_quality_flag,
+                quality_note,
+            )
+        )
+
+        patient_last_noshow[patient_id] = encounter_status == "NoShow"
+
+    cursor.executemany(
+        """
+        INSERT INTO fact_encounter (
+            encounter_id,
+            patient_id,
+            provider_id,
+            facility_id,
+            diagnosis_id,
+            payer_id,
+            request_date_key,
+            scheduled_date_key,
+            completed_date_key,
+            encounter_status,
+            visit_type,
+            wait_days,
+            duration_minutes,
+            outcome_score,
+            no_show_flag,
+            sigma_band,
+            data_quality_flag,
+            quality_note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+
+
 def reset_tables(cursor: sqlite3.Cursor) -> None:
     cursor.execute("DELETE FROM fact_encounter")
     cursor.execute("DELETE FROM dim_provider")
@@ -264,12 +433,15 @@ def main() -> None:
         cursor = connection.cursor()
         reset_tables(cursor)
 
-        build_dim_date(cursor, dt.date(2023, 1, 1), dt.date(2024, 12, 31))
+        start_date = dt.date(2023, 1, 1)
+        end_date = dt.date(2024, 12, 31)
+        build_dim_date(cursor, start_date, end_date)
         facility_ids = build_dim_facility(cursor)
         build_dim_provider(cursor, facility_ids)
         build_dim_patient(cursor)
         build_dim_diagnosis(cursor)
         build_dim_payer(cursor)
+        build_fact_encounter(cursor, start_date, end_date)
 
         connection.commit()
 
