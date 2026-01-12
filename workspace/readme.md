@@ -1,6 +1,6 @@
 # Ralph & Dan Contract: Learning Dataset Spec
 
-This file is an AUTHORITATIVE contract for Ralph. Do not rely on any external context.
+This file is an AUTHORITATIVE contract for Ralph. Ralph must operate with zero outside context.
 
 ## Purpose
 This workspace spec defines the learner-facing dataset expectations for the Six Sigma mental health operations dataset. Treat it as the source of truth.

@@ -1,6 +1,6 @@
 # Ralph & Dan Contract: Generator Architecture
 
-This file is an AUTHORITATIVE contract for Ralph. Do not rely on any external context.
+This file is an AUTHORITATIVE contract for Ralph. Ralph must operate with zero outside context.
 
 ## Schema Declaration
 - Dimensions: facilities, providers, patients, services, dates, referral sources
@@ -8,7 +8,7 @@ This file is an AUTHORITATIVE contract for Ralph. Do not rely on any external co
 - Meta: single-row table for spec hashes and run metadata
 
 ## Generation Order (Mandatory)
-1. Load authoritative specs (`README.md`, `architect.md`) and compute SHA256 hashes
+1. Load authoritative specs (`workspace/readme.md`, `workspace/architecture.md`) and compute SHA256 hashes
 2. Create SQLite with `PRAGMA foreign_keys = ON`
 3. Populate dimension tables first and cache their keys
 4. Generate fact tables using only cached keys
@@ -27,7 +27,7 @@ This file is an AUTHORITATIVE contract for Ralph. Do not rely on any external co
 - `vw_wait_time_audit` (mismatch_count must be 0)
 
 ## Traceability Requirements
-- SHA256 hashes of `README.md` and `architect.md` stored in the SQLite meta table
+- SHA256 hashes of `workspace/readme.md` and `workspace/architecture.md` stored in the SQLite meta table
 - Hashes written to `workspace/spec_fingerprint.json`
 
 ## Authority Statement
