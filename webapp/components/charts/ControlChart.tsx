@@ -39,9 +39,12 @@ export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
     return (
         <Card className="h-[500px]">
             <CardHeader>
-                <CardTitle>X-Bar Control Chart (Daily Avg Wait Time)</CardTitle>
+                <CardTitle>X-Bar Control Chart (Daily Avg Wait Time) - DEBUG v3</CardTitle>
             </CardHeader>
             <CardContent className="h-[420px]">
+                <div className="mb-2 text-xs font-mono text-blue-600 bg-blue-50 p-2 rounded">
+                    DEBUG PROPS: Points={data?.length} | First={data?.[0] ? JSON.stringify(data[0]) : "None"}
+                </div>
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" />
