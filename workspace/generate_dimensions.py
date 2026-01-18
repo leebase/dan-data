@@ -304,7 +304,8 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
 
     max_wait_days = 30
     all_dates = date_range(start, end)
-    latest_request_date = end - dt.timedelta(days=max_wait_days)
+    # Since dim_date extends to 2025, we can generate requests right up to the end of 2024
+    latest_request_date = end 
     request_dates = [date for date in all_dates if date <= latest_request_date]
 
     patient_provider = {}
