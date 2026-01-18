@@ -333,8 +333,24 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
         }[visit_type]
         if facility_regions.get(facility_id) == "Rural":
             base_wait += random.randint(2, 6)
-        wait_days = max(0, min(base_wait, max_wait_days))
+        
+        # SPC Logic: Allow occasional massive outliers (process failures)
+        # 1% chance of a "process break" causing waits up to 90 days
+        if random.random() < 0.01:
+             wait_days = random.randint(35, 90)
+        else:
+             wait_days = max(0, min(base_wait, max_wait_days))
+        
         scheduled_date = request_date + dt.timedelta(days=wait_days)
+
+        # Audit Logic: Inject "Data Entry Errors" -> mismatch between dates and stored wait_days
+        # The stored wait_days will be wrong for 2% of records
+        stored_wait_days = wait_days
+        if random.random() < 0.02:
+            stored_wait_days = max(0, wait_days + random.randint(-5, 5))
+            # Ensure it's actually different (if rand resulted in 0 change)
+            if stored_wait_days == wait_days:
+                stored_wait_days += 1
 
         month = scheduled_date.month
         weekday = scheduled_date.isoweekday()
@@ -388,7 +404,7 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
                 completed_date_key,
                 encounter_status,
                 visit_type,
-                wait_days,
+                stored_wait_days,
                 duration_minutes,
                 outcome_score,
                 no_show_flag,
@@ -507,14 +523,16 @@ def main() -> None:
         reset_tables(cursor)
 
         start_date = dt.date(2023, 1, 1)
-        end_date = dt.date(2024, 12, 31)
-        build_dim_date(cursor, start_date, end_date)
+        fact_end_date = dt.date(2024, 12, 31)
+        dim_end_date = dt.date(2025, 12, 31)
+        
+        build_dim_date(cursor, start_date, dim_end_date)
         facility_ids = build_dim_facility(cursor)
         build_dim_provider(cursor, facility_ids)
         build_dim_patient(cursor)
         build_dim_diagnosis(cursor)
         build_dim_payer(cursor)
-        build_fact_encounter(cursor, start_date, end_date)
+        build_fact_encounter(cursor, start_date, fact_end_date)
         
         # Create views and meta
         create_views(cursor)
