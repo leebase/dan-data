@@ -10,17 +10,6 @@ You will use Power BI to answer real leadership questions, validate metrics like
 
 ---
 
-## 🧭 IMPORTANT: How the Ralph Loop Works (for you + for Ralph)
-That means these files are the *contract*:
-
-1. `readme.md` — what Dan must do
-2. `architecture.md` — how the dataset must be generated
-3. `prd.json` — what Ralph must build
-
-*(See [readme-ralph.md](readme-ralph.md) for full technical contract details)*
-
----
-
 ## 🛠️ Setup & Workflow (Dan)
 
 ### Step 1 — Connect Power BI to SQLite

@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import {
-    ComposedChart,
+    LineChart,
     Line,
-    Scatter,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -27,6 +26,27 @@ interface ControlChartProps {
     lcl: number;
 }
 
+// Custom dot component that colors outliers red
+const CustomDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!cx || !cy) return null;
+
+    const isOutlier = payload?.isOutlier;
+    const fill = isOutlier ? "#ef4444" : "#64748b";
+    const radius = isOutlier ? 6 : 3;
+
+    return (
+        <circle
+            cx={cx}
+            cy={cy}
+            r={radius}
+            fill={fill}
+            stroke={isOutlier ? "#dc2626" : "none"}
+            strokeWidth={isOutlier ? 2 : 0}
+        />
+    );
+};
+
 export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
     const [mounted, setMounted] = useState(false);
 
@@ -43,12 +63,13 @@ export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
             </CardHeader>
             <CardContent className="h-[420px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis domain={['auto', 'auto']} fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 'auto']} fontSize={12} tickLine={false} axisLine={false} />
                         <Tooltip
                             contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: 'none', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            formatter={(value: number) => [`${value.toFixed(2)} days`, 'Avg Wait']}
                         />
 
                         {/* Control Limits */}
@@ -56,24 +77,17 @@ export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
                         <ReferenceLine y={ucl} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'UCL (3σ)', position: 'right', fill: '#ef4444', fontSize: 12 }} />
                         <ReferenceLine y={lcl} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'LCL (3σ)', position: 'right', fill: '#ef4444', fontSize: 12 }} />
 
-                        {/* Line: Black, No Animation, Visible Dots */}
+                        {/* Line with custom dots - outliers are red and larger */}
                         <Line
                             type="monotone"
                             dataKey="value"
                             stroke="#000000"
                             strokeWidth={2}
-                            dot={{ r: 3, fill: "#64748b" }}
-                            activeDot={{ r: 6 }}
+                            dot={<CustomDot />}
+                            activeDot={{ r: 8 }}
                             isAnimationActive={false}
                         />
-
-                        {/* Highlight Outliers */}
-                        <Scatter
-                            data={data.filter(d => d.isOutlier)}
-                            fill="#ef4444"
-                            shape="circle"
-                        />
-                    </ComposedChart>
+                    </LineChart>
                 </ResponsiveContainer>
             </CardContent>
         </Card>
