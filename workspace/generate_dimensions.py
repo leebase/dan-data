@@ -334,9 +334,18 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
         if facility_regions.get(facility_id) == "Rural":
             base_wait += random.randint(2, 6)
         
-        # SPC Logic: Allow occasional massive outliers (process failures)
+        # Crisis Mode: Systemic failure in late 2024
+        # Trigger based on request_date to avoid circular dependency
+        is_crisis_period = request_date.year == 2024 and request_date.month == 12 and request_date.day > 10
+        
+        if is_crisis_period:
+            # Massive spike in wait times for EVERYONE in this period
+            # This simulates a "Process Break" evident on X-Bar charts
+            wait_days = base_wait + random.randint(20, 50)
+        
+        # SPC Logic: Allow occasional massive outliers (random process failures)
         # 1% chance of a "process break" causing waits up to 90 days
-        if random.random() < 0.01:
+        elif random.random() < 0.01:
              wait_days = random.randint(35, 90)
         else:
              wait_days = max(0, min(base_wait, max_wait_days))
@@ -390,6 +399,18 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
 
         data_quality_flag = 1 if random.random() < 0.025 else 0
         quality_note = random.choice(quality_notes) if data_quality_flag == 1 else ""
+        
+        # Calculate consistent Sigma Band (approximate Process Mean=14, Sigma=8)
+        # This makes the "sigma_band" column actually match the data
+        dist_from_mean = abs(wait_days - 14)
+        if dist_from_mean < 8:
+            sigma_band = "Within_1σ"
+        elif dist_from_mean < 16:
+            sigma_band = "Within_2σ"
+        elif dist_from_mean < 24:
+            sigma_band = "Within_3σ"
+        else:
+            sigma_band = "Outside_3σ"
 
         rows.append(
             (
@@ -408,12 +429,12 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
                 duration_minutes,
                 outcome_score,
                 no_show_flag,
-                sigma_band_value(),
+                sigma_band,
                 data_quality_flag,
                 quality_note,
             )
         )
-
+        
         patient_last_noshow[patient_id] = encounter_status == "NoShow"
 
     cursor.executemany(
