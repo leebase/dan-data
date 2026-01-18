@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 import random
 import sqlite3
 from pathlib import Path
@@ -13,6 +15,19 @@ DB_PATH = Path(__file__).resolve().parent / "mental_health_demo.sqlite"
 
 def date_key(date: dt.date) -> int:
     return int(date.strftime("%Y%m%d"))
+
+
+def compute_file_hash(filepath: Path) -> str:
+    """Compute SHA256 hash of a file."""
+    if not filepath.exists():
+        return "MISSING"
+    
+    sha256_hash = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        # Read and update hash string value in blocks of 4K
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 
 def quarter_for_month(month: int) -> int:
@@ -412,6 +427,64 @@ def build_fact_encounter(cursor: sqlite3.Cursor, start: dt.date, end: dt.date) -
     )
 
 
+def create_views(cursor: sqlite3.Cursor) -> None:
+    """Create verification views."""
+    # vw_kpi_baseline
+    cursor.execute("DROP VIEW IF EXISTS vw_kpi_baseline")
+    cursor.execute("""
+    CREATE VIEW vw_kpi_baseline AS
+    SELECT
+        COUNT(encounter_id) as total_encounters,
+        ROUND(AVG(wait_days), 1) as avg_wait_days,
+        ROUND(CAST(SUM(no_show_flag) AS FLOAT) / COUNT(*) * 100, 1) as no_show_rate
+    FROM fact_encounter
+    """)
+    
+    # vw_wait_time_audit
+    cursor.execute("DROP VIEW IF EXISTS vw_wait_time_audit")
+    cursor.execute("""
+    CREATE VIEW vw_wait_time_audit AS
+    SELECT 
+        COUNT(*) as total_rows,
+        SUM(CASE WHEN wait_days != (JULIANDAY(SUBSTR(scheduled_date_key, 1, 4) || '-' || SUBSTR(scheduled_date_key, 5, 2) || '-' || SUBSTR(scheduled_date_key, 7, 2)) - JULIANDAY(SUBSTR(request_date_key, 1, 4) || '-' || SUBSTR(request_date_key, 5, 2) || '-' || SUBSTR(request_date_key, 7, 2))) THEN 1 ELSE 0 END) as mismatch_count,
+        AVG(wait_days - (JULIANDAY(SUBSTR(scheduled_date_key, 1, 4) || '-' || SUBSTR(scheduled_date_key, 5, 2) || '-' || SUBSTR(scheduled_date_key, 7, 2)) - JULIANDAY(SUBSTR(request_date_key, 1, 4) || '-' || SUBSTR(request_date_key, 5, 2) || '-' || SUBSTR(request_date_key, 7, 2)))) as avg_variance
+    FROM fact_encounter
+    """)
+
+
+def build_meta(cursor: sqlite3.Cursor, readme_hash: str, arch_hash: str) -> None:
+    """Populate meta table with traceability info."""
+    cursor.execute("DELETE FROM meta")
+    cursor.execute("DROP TABLE IF EXISTS meta")
+    cursor.execute("""
+        CREATE TABLE meta (
+            dataset_name TEXT,
+            version TEXT,
+            generated_utc TEXT,
+            random_seed INTEGER,
+            rowcount_fact_encounter INTEGER,
+            spec_version TEXT,
+            readme_sha256 TEXT,
+            architecture_sha256 TEXT,
+            dedication TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        INSERT INTO meta VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        "Mental Health Ops Demo",
+        "1.0",
+        dt.datetime.now(dt.timezone.utc).isoformat(),
+        42,
+        80000,
+        "1.0",
+        readme_hash,
+        arch_hash,
+        "To all ops leaders who see patterns where others see chaos"
+    ))
+
+
 def reset_tables(cursor: sqlite3.Cursor) -> None:
     cursor.execute("DELETE FROM fact_encounter")
     cursor.execute("DELETE FROM dim_provider")
@@ -442,8 +515,33 @@ def main() -> None:
         build_dim_diagnosis(cursor)
         build_dim_payer(cursor)
         build_fact_encounter(cursor, start_date, end_date)
+        
+        # Create views and meta
+        create_views(cursor)
+        
+        # Compute hashes
+        readme_path = DB_PATH.parent / "readme.md"
+        arch_path = DB_PATH.parent / "architecture.md"
+        readme_hash = compute_file_hash(readme_path)
+        arch_hash = compute_file_hash(arch_path)
+        
+        # Build meta
+        build_meta(cursor, readme_hash, arch_hash)
 
         connection.commit()
+    
+    # Write spec_fingerprint.json
+    fingerprint = {
+        "spec_version": "1.0",
+        "readme_sha256": readme_hash,
+        "architecture_sha256": arch_hash,
+        "random_seed": 42,
+        "rowcount_fact_encounter": 80000
+    }
+    
+    with open(DB_PATH.parent / "spec_fingerprint.json", "w") as f:
+        json.dump(fingerprint, f, indent=2)
+        print(f"Fingerprint written to {DB_PATH.parent / 'spec_fingerprint.json'}")
 
 
 if __name__ == "__main__":

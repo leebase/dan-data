@@ -57,6 +57,24 @@ Before visualizing, do a Black Belt audit:
 
 ---
 
+## ✅ How to Verify Your Work (The Answer Key)
+We have built a **Verification Web App** that mimics the exact Power BI dashboards you are trying to build. Use this as your "Answer Key" to check your numbers and logic.
+
+### How to Run It (Easy Mode)
+1. Open your terminal (PowerShell or Command Prompt) in this folder.
+2. Run this single command:
+   ```bash
+   docker-compose up webapp
+   ```
+3. Open your browser to: **[http://localhost:3000](http://localhost:3000)**
+
+### What You Will See
+- **Define Phase**: Compare your KPI totals against these numbers.
+- **Measure Phase**: See the exact rows that fail the wait time audit.
+- **Analyze/Control**: See the target charts (Pareto, Control Charts) to replicate.
+
+---
+
 ## 📊 Your DMAIC Journey
 
 ### Phase 1: DEFINE — Establish the Baseline
