@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
     ComposedChart,
     Line,
@@ -27,6 +28,14 @@ interface ControlChartProps {
 }
 
 export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return <Card className="h-[500px] animate-pulse bg-slate-100" />;
+
     return (
         <Card className="h-[500px]">
             <CardHeader>
@@ -47,7 +56,15 @@ export function ControlChart({ data, mean, ucl, lcl }: ControlChartProps) {
                         <ReferenceLine y={ucl} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'UCL (3σ)', position: 'right', fill: '#ef4444', fontSize: 12 }} />
                         <ReferenceLine y={lcl} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'LCL (3σ)', position: 'right', fill: '#ef4444', fontSize: 12 }} />
 
-                        <Line type="monotone" dataKey="value" stroke="#64748b" dot={false} strokeWidth={2} activeDot={{ r: 6 }} />
+                        <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke="#000000"
+                            strokeWidth={2}
+                            dot={{ r: 3, fill: "#64748b" }}
+                            activeDot={{ r: 6 }}
+                            isAnimationActive={false}
+                        />
 
                         {/* Highlight Outliers */}
                         <Scatter
